@@ -33,11 +33,12 @@ class BaseActivity:
         self.type = type
         self.duration = duration
         self.future_result = future_result
+        self.start_tick = None
 
     def start(self, tick: int) -> None:
         if self.status == READY:
             self.start_tick = tick
-        self.status = RUNNING
+            self.status = RUNNING
 
     def progress(self, tick: int) -> None:
         if tick < self.start_tick:
@@ -60,8 +61,8 @@ class BaseActivity:
 
     def get_type(self) -> str:
         return self.type
-    
-    def take_resources(self, resources:Dict) -> Dict:
+
+    def take_resources(self, resources: Dict) -> Dict:
         """
         Consume the needed resources to do the activity.
 
@@ -73,18 +74,18 @@ class BaseActivity:
 
     def __str__(self) -> str:
         return json.dumps(self.to_dict())
-    
+
     def to_dict(self) -> Dict:
         return self.__dict__
-    
+
 
 class MineFooActivity(BaseActivity):
     """Take 1 tick, produce 1 Foo"""
 
     def __init__(self) -> None:
         super().__init__(type=MINEFOO, duration=1, future_result=1)
-    
-    def take_resources(self, resources:Dict) -> Dict:
+
+    def take_resources(self, resources: Dict) -> Dict:
         # no resource needed.
         return resources.copy()
 
@@ -104,8 +105,8 @@ class MineBarActivity(BaseActivity):
             duration=[0.5, 1.0, 1.5, 2.0][random.randint(0, 3)],
             future_result=1,
         )
-    
-    def take_resources(self, resources:Dict) -> Dict:
+
+    def take_resources(self, resources: Dict) -> Dict:
         # no resource needed.
         return resources.copy()
 
@@ -121,8 +122,8 @@ class AssembleFoobar(BaseActivity):
             duration=2,
             future_result=[1, 1, 1, 0, 0][random.randint(0, 4)],
         )
-    
-    def take_resources(self, resources:Dict) -> Dict:
+
+    def take_resources(self, resources: Dict) -> Dict:
         try:
             if resources["foos"] < 1 or resources["bars"] < 1:
                 raise ActivityException("Not enough resource for activity %s", self)
@@ -136,15 +137,15 @@ class AssembleFoobar(BaseActivity):
 class SellFoobar(BaseActivity):
     """Take 10 ticks, produce the requested number of money units"""
 
-    def __init__(self, nbtosell: int) -> None:
+    def __init__(self, nbtosell: int = 1) -> None:
         if nbtosell < 1 or nbtosell > 5:
             raise ValueError("nbtosell must be between 1 and 5")
         super().__init__(type=SELLFOOBAR, duration=10, future_result=nbtosell)
         self.nbtosell = nbtosell
-    
-    def take_resources(self, resources:Dict) -> Dict:
+
+    def take_resources(self, resources: Dict) -> Dict:
         try:
-            if resources["foobars"] <  self.nbtosell:
+            if resources["foobars"] < self.nbtosell:
                 raise ActivityException("Not enough resource for activity %s", self)
         except KeyError:
             raise ActivityException("Not enough resource for activity %s", self)
@@ -157,10 +158,10 @@ class BuyRobot(BaseActivity):
 
     def __init__(self) -> None:
         super().__init__(type=BUYROBOT, duration=0, future_result=1)
-    
-    def take_resources(self, resources:Dict) -> Dict:
+
+    def take_resources(self, resources: Dict) -> Dict:
         try:
-            if resources["money"] <  3 or resources["foos"] < 6:
+            if resources["money"] < 3 or resources["foos"] < 6:
                 raise ActivityException("Not enough resource for activity %s", self)
         except KeyError:
             raise ActivityException("Not enough resource for activity %s", self)
