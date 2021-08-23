@@ -38,9 +38,13 @@ class Robot:
             self.current_activity_start_tick = tick
 
     def work(self, tick: int) -> activities.BaseActivity:
-        """Make"""
+        """
+        Make the current activity progress
+
+        If the activity is completed, it is returned.
+        Otherwise, return nothing.
+        """
         if not self.current_activity:
-            # raise RobotException("Robot has no scheduled activity")
             return None
         if self.status == SCHEDULING:
             if tick >= self.current_activity_start_tick:
@@ -60,8 +64,12 @@ class Robot:
         output = {"status": self.status}
         if self.current_activity:
             output["current"] = self.current_activity.to_dict()
+        else:
+            output["current"] = None
         if self.previous_activity:
             output["previous"] = self.previous_activity.to_dict()
+        else:
+            output["previous"] = None
         return output
 
     def __str__(self) -> str:
