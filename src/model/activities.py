@@ -26,7 +26,11 @@ class ActivityException(Exception):
 
 
 class BaseActivity:
-    """Base class, handles status logic in an uniform way"""
+    """
+    Base class, handles status logic in an uniform way.
+
+    CAUTION : NOT THREAD-SAFE
+    """
 
     def __init__(self, type: str, duration: float, future_result: int) -> None:
         self.status = READY
@@ -36,11 +40,19 @@ class BaseActivity:
         self.start_tick = None
 
     def start(self, tick: int) -> None:
+        """
+        Launch the activity and register the start tick.
+
+        Do nothing if the activity is not in READY state.
+        """
         if self.status == READY:
             self.start_tick = tick
             self.status = RUNNING
+            # A startup is a special kind of progress !
+            self.progress(tick=tick)
 
     def progress(self, tick: int) -> None:
+        """Advance the activity change its status to COMPLETED if it is done."""
         if tick < self.start_tick:
             raise ActivityException(
                 f"Current tick value {tick} is less than start_tick {self.start_tick}"
@@ -49,24 +61,25 @@ class BaseActivity:
             self.status = COMPLETED
 
     def result(self) -> int:
+        """
+        Give back the activity result as an int : number of entities produced.
+
+        The context (type of activity) provide info about what has been produced.
+        """
         if self.status == COMPLETED:
             return self.future_result
         raise ActivityException("Activity has not completed, cannot get result")
 
-    def get_status(self) -> str:
-        return self.status
-
     def has_completed(self, tick) -> bool:
         return tick - self.start_tick >= self.duration
-
-    def get_type(self) -> str:
-        return self.type
 
     def take_resources(self, resources: Dict) -> Dict:
         """
         Consume the needed resources to do the activity.
 
-        Returns the remaining resources after consumption.
+        Arguments:
+          - resources: Dict of resources available before the activity
+        Return the remaining resources after consumption.
         Raise ActivityException if resources are not sufficient.
         """
         # base implementation : need nothing.
@@ -76,10 +89,11 @@ class BaseActivity:
         return json.dumps(self.to_dict())
 
     def to_dict(self) -> Dict:
+        """Return a dictionary-based representation of the activity"""
         return self.__dict__
 
 
-class MineFooActivity(BaseActivity):
+class MineFoo(BaseActivity):
     """Take 1 tick, produce 1 Foo"""
 
     def __init__(self) -> None:
@@ -90,7 +104,7 @@ class MineFooActivity(BaseActivity):
         return resources.copy()
 
 
-class MineBarActivity(BaseActivity):
+class MineBar(BaseActivity):
     """Take between 0.5 and 2 ticks, produce one Bar"""
 
     def __init__(self) -> None:
