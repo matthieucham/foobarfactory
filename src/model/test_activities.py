@@ -54,10 +54,8 @@ class TestActivityCommon:
         # Given
         activity.status = status
         activity.start_tick = 1
-
         # When
         activity.start(tick=2)
-
         # Then
         assert activity.start_tick == 1
         assert activity.status == status
