@@ -1,6 +1,5 @@
 import pytest
 from unittest.mock import MagicMock
-import json
 import copy
 
 from . import robots, activities

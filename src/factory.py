@@ -2,7 +2,7 @@ import copy
 import json
 import logging
 from collections import defaultdict
-from typing import Dict
+from typing import Dict, List, Tuple
 from model import robots
 from model.activities import (
     ActivityException,
@@ -17,10 +17,23 @@ from model.activities import (
 # TODO move logger config to main script
 from logging.config import fileConfig
 
-fileConfig("logging.ini")
+# fileConfig("logging.ini")
 
 # App logger as configured by logger.py
 logger = logging.getLogger()
+
+
+def group_by_previous_activity(
+    robots: List[robots.Robot], no_act_key: str = "idle"
+) -> Dict[str, robots.Robot]:
+    """Organize robots by type of their previous activity"""
+    bots_by_act = defaultdict(list)
+    for bot in robots:
+        if bot.previous_activity:
+            bots_by_act[bot.previous_activity.type].append(bot)
+        else:
+            bots_by_act[no_act_key].append(bot)
+    return bots_by_act
 
 
 class FactoryException(Exception):
@@ -51,7 +64,7 @@ class Factory:
     ### PUBLIC METHODS ###
 
     def run(self, tick: int) -> None:
-        """Run the factory at the specified tick and returns a view of the situation after the tick"""
+        """Run the factory at the specified tick and update the situation"""
         logger.debug("running factory at tick %s", tick)
         for rob in self.robots:
             logger.debug("advancing work of robot %s", rob)
@@ -63,44 +76,47 @@ class Factory:
         If any activity is wrong (not enough resources) then an exception is raised
         and no activity is assigned to any robot"""
         future_resources = self.resources.copy()  # shallow copy is enough here
+        avrobots = [r for r in self.robots if r.status == robots.READY]
+        assignments = self._validate_activities(avrobots, future_resources, *activities)
+        # All checks have passed, assignments are valid so:
+        for robot, activity in assignments:
+            self.resources = activity.take_resources(self.resources)
+            robot.schedule(activity=activity, tick=tick)
+
+    ### PRIVATE METHODS ###
+
+    def _validate_activities(
+        self, available_robots, available_resources, *activities
+    ) -> List[Tuple[robots.Robot, BaseActivity]]:
+        """
+        Validate activities and return assignments (robot, activity)
+
+        Raise FactoryException if any activity is invalid (not enough resource)
+        """
         future_assignments = list()
-        avrobots = self._get_available_robots()
-        if len(avrobots) < len(activities):
+        if len(available_robots) < len(activities):
             raise FactoryException("Not enough available robots")
         try:
             # reorder activities to have previous first
             # in order to minimize changing assignment time
             previousacts = {
                 bot.previous_activity.type if bot.previous_activity else None
-                for bot in avrobots
+                for bot in available_robots
             }
             sortedacts = sorted(
-                activities, key=lambda act: 0 if act in previousacts else 1
+                activities, key=lambda act: 0 if act.type in previousacts else 1
             )
-            bots_by_act = defaultdict(list)
-            for bot in avrobots:
-                if bot.previous_activity:
-                    bots_by_act[bot.previous_activity.type].append(bot)
-                else:
-                    bots_by_act["idle"].append(bot)
             for act in sortedacts:
-                future_resources = act.take_ressources(future_resources)
+                available_resources = act.take_ressources(available_resources)
                 # Try to assign the act to a robot which previously did the same activity
                 # to minimize the time lost between activities
-                assigned = self._find_good_robot(bots_by_act, act.type)
+                assigned = self._find_good_robot(available_robots, act.type)
+                # the assigned robot is no longer available:
+                available_robots.remove(assigned)
                 future_assignments.append((assigned, act))
+            return future_assignments
         except ActivityException as actexcept:
             raise FactoryException("Not enough resources", actexcept)
-        # All checks have passed, assignments are valid so:
-        for robot, activity in future_assignments:
-            self.resources = activity.take_resources(self.resources)
-            robot.schedule(activity=activity, tick=tick)
-
-    ### PRIVATE METHODS ###
-
-    def _get_available_robots(self):
-        """Return the list of available robots"""
-        return [r for r in self.robots if r.status == robots.READY]
 
     def _update_after_activity(self, activity: BaseActivity) -> None:
         """Update the factory situation after the processing of the provided activity"""
@@ -121,7 +137,7 @@ class Factory:
             logger.debug(
                 "activity %s completed, result=%s", activity, activity.result()
             )
-            self.situation["foobars"] += activity.result()
+            self.resources["foobars"] += activity.result()
             # the bar is reusable if no new foobar assembled
             if activity.result() == 0:
                 self.resources["bars"] += 1
@@ -143,14 +159,15 @@ class Factory:
         # 1- robot with the same previous activity type
         # 2- robot without previous activity
         # 3- robot with a different activity
-        sameact = avrobots.get(activity_type, [])
+        robots = group_by_previous_activity(avrobots)
+        sameact = robots.get(activity_type, [])
         if len(sameact) > 0:
             return sameact.pop()
-        idle = avrobots.get("idle", [])
+        idle = robots.get("idle", [])
         if len(idle) > 0:
             return idle.pop()
         # now, any bot will do...
-        for _, bots in avrobots.items():
+        for _, bots in robots.items():
             if len(bots) > 0:
                 return bots.pop()
         # should not happen
