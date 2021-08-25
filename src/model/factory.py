@@ -3,8 +3,8 @@ import json
 import logging
 from collections import defaultdict
 from typing import Dict, List, Tuple
-from model import robots
-from model.activities import (
+from . import robots
+from .activities import (
     ActivityException,
     BaseActivity,
     MINEBAR,

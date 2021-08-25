@@ -1,9 +1,8 @@
 import pytest
 from unittest.mock import call, patch, MagicMock
 
-import factory
 import json
-from model import activities, robots
+from . import activities, robots, factory
 
 
 # Fixtures
