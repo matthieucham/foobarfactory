@@ -1,5 +1,8 @@
+from unittest.mock import MagicMock
 import pytest
 import json
+
+from model.constants import COMPLETED, CONSUMED, RES_KEY_FOOS
 
 from . import activities
 
@@ -66,7 +69,6 @@ class TestActivityCommon:
             "start_tick",
             "notfinished_tick",
             "done_tick",
-            "possible_result",
         ],
         argvalues=[
             (
@@ -74,58 +76,88 @@ class TestActivityCommon:
                 1,
                 1,
                 2,
-                {
-                    1,
-                },
             ),
             (
                 activities.MineBar(),
                 1,
                 1,
                 3,
-                {
-                    1,
-                },
             ),
             (
                 activities.AssembleFoobar(),
                 1,
                 2,
                 3,
-                {
-                    0,
-                    1,
-                },
             ),
             (
                 activities.SellFoobar(nbtosell=3),
                 1,
                 5,
                 11,
-                {
-                    3,
-                },
             ),
         ],
     )
-    def test_progress_result(
-        self, activity, start_tick, notfinished_tick, done_tick, possible_result
-    ):
+    def test_progress(self, activity, start_tick, notfinished_tick, done_tick):
         # set the start tick of the activity
         activity.start(start_tick)
         # check that the activity is still running
         activity.progress(notfinished_tick)
         assert activity.status == activities.RUNNING
         assert not activity.has_completed(notfinished_tick)
-        # in this case it is not allowed to retrieve the result
-        with pytest.raises(activities.ActivityException):
-            activity.result()
         # do the activity progress past upon its duration
         activity.progress(done_tick)
         assert activity.status == activities.COMPLETED
         assert activity.has_completed(done_tick)
-        # the result is now available
-        assert activity.result() in possible_result
+
+    @pytest.mark.parametrize(
+        argnames=["activity", "status"],
+        argvalues=[
+            (activities.MineFoo(), activities.RUNNING),
+            (activities.MineFoo(), activities.COMPLETED),
+            (activities.MineFoo(), activities.CONSUMED),
+            (activities.MineBar(), activities.RUNNING),
+            (activities.MineBar(), activities.COMPLETED),
+            (activities.MineBar(), activities.CONSUMED),
+            (activities.AssembleFoobar(), activities.RUNNING),
+            (activities.AssembleFoobar(), activities.COMPLETED),
+            (activities.AssembleFoobar(), activities.CONSUMED),
+            (activities.SellFoobar(), activities.RUNNING),
+            (activities.SellFoobar(), activities.COMPLETED),
+            (activities.SellFoobar(), activities.CONSUMED),
+            (activities.BuyRobot(), activities.RUNNING),
+            (activities.BuyRobot(), activities.COMPLETED),
+            (activities.BuyRobot(), activities.CONSUMED),
+        ],
+    )
+    def test_take_resources_badstatus(self, activity, status):
+        activity.status = status
+        with pytest.raises(activities.ActivityStatusException):
+            activity.take_resources({})
+
+    @pytest.mark.parametrize(
+        argnames=["activity", "status"],
+        argvalues=[
+            (activities.MineFoo(), activities.RUNNING),
+            (activities.MineFoo(), activities.READY),
+            (activities.MineFoo(), activities.CONSUMED),
+            (activities.MineBar(), activities.RUNNING),
+            (activities.MineBar(), activities.READY),
+            (activities.MineBar(), activities.CONSUMED),
+            (activities.AssembleFoobar(), activities.RUNNING),
+            (activities.AssembleFoobar(), activities.READY),
+            (activities.AssembleFoobar(), activities.CONSUMED),
+            (activities.SellFoobar(), activities.RUNNING),
+            (activities.SellFoobar(), activities.READY),
+            (activities.SellFoobar(), activities.CONSUMED),
+            (activities.BuyRobot(), activities.RUNNING),
+            (activities.BuyRobot(), activities.READY),
+            (activities.BuyRobot(), activities.CONSUMED),
+        ],
+    )
+    def test_deliver_result_badstatus(self, activity, status):
+        activity.status = status
+        with pytest.raises(activities.ActivityStatusException):
+            activity.deliver_result({})
 
 
 # Tests for specific activity
@@ -148,8 +180,29 @@ class TestMineFoo:
         remaining = act.take_resources(resources=beforedict)
         assert remaining == afterdict
         # make sure the output is decoupled from the input
-        beforedict["foos"] = 10
-        assert remaining["foos"] == afterdict["foos"]
+        beforedict[RES_KEY_FOOS] = 10
+        assert remaining[RES_KEY_FOOS] == afterdict[RES_KEY_FOOS]
+
+    @pytest.mark.parametrize(
+        argnames=["before", "after"],
+        argvalues=(
+            (
+                '{"foos": 0,"bars": 0,"foobars": 0,"money": 0}',
+                '{"foos": 1,"bars": 0,"foobars": 0,"money": 0}',
+            ),
+        ),
+    )
+    def test_deliver_result_ok(self, before, after):
+        act = activities.MineFoo()
+        act.status = COMPLETED
+        beforedict = json.loads(before)
+        afterdict = json.loads(after)
+        remaining = act.deliver_result(resources=beforedict)
+        assert remaining == afterdict
+        # make sure the output is decoupled from the input
+        beforedict[RES_KEY_FOOS] = 10
+        assert remaining[RES_KEY_FOOS] == afterdict[RES_KEY_FOOS]
+        assert act.status == CONSUMED
 
 
 class TestMineBar:
@@ -176,8 +229,29 @@ class TestMineBar:
         remaining = act.take_resources(resources=beforedict)
         assert remaining == afterdict
         # make sure the output is decoupled from the input
-        beforedict["foos"] = 10
-        assert remaining["foos"] == afterdict["foos"]
+        beforedict[RES_KEY_FOOS] = 10
+        assert remaining[RES_KEY_FOOS] == afterdict[RES_KEY_FOOS]
+
+    @pytest.mark.parametrize(
+        argnames=["before", "after"],
+        argvalues=(
+            (
+                '{"foos": 0,"bars": 0,"foobars": 0,"money": 0}',
+                '{"foos": 0,"bars": 1,"foobars": 0,"money": 0}',
+            ),
+        ),
+    )
+    def test_deliver_result_ok(self, before, after):
+        act = activities.MineBar()
+        act.status = COMPLETED
+        beforedict = json.loads(before)
+        afterdict = json.loads(after)
+        remaining = act.deliver_result(resources=beforedict)
+        assert remaining == afterdict
+        # make sure the output is decoupled from the input
+        beforedict[RES_KEY_FOOS] = 10
+        assert remaining[RES_KEY_FOOS] == afterdict[RES_KEY_FOOS]
+        assert act.status == CONSUMED
 
 
 class TestAssembleFoobar:
@@ -228,8 +302,30 @@ class TestAssembleFoobar:
     def test_take_resources_failure(self, before):
         act = activities.AssembleFoobar()
         beforedict = json.loads(before)
-        with pytest.raises(activities.ActivityException):
+        with pytest.raises(activities.ActivityResourcesException):
             act.take_resources(resources=beforedict)
+
+    @pytest.mark.parametrize(
+        argnames=["before", "possibleafters"],
+        argvalues=(
+            (
+                '{"foos": 0,"bars": 0,"foobars": 0,"money": 0}',
+                '[{"foos": 0,"bars": 0,"foobars": 1,"money": 0}, {"foos": 0,"bars":'
+                ' 1,"foobars": 0,"money": 0}]',
+            ),
+        ),
+    )
+    def test_deliver_result_ok(self, before, possibleafters):
+        act = activities.AssembleFoobar()
+        act.status = COMPLETED
+        beforedict = json.loads(before)
+        afterdictlist = json.loads(possibleafters)
+        remaining = act.deliver_result(resources=beforedict)
+        assert remaining in afterdictlist
+        # make sure the output is decoupled from the input
+        beforedict[RES_KEY_FOOS] = 10
+        assert remaining[RES_KEY_FOOS] == afterdictlist[0][RES_KEY_FOOS]
+        assert act.status == CONSUMED
 
 
 class TestSellFoobar:
@@ -299,8 +395,35 @@ class TestSellFoobar:
     def test_take_resources_failure(self, nbtosell, before):
         act = activities.SellFoobar(nbtosell)
         beforedict = json.loads(before)
-        with pytest.raises(activities.ActivityException):
+        with pytest.raises(activities.ActivityResourcesException):
             act.take_resources(resources=beforedict)
+
+    @pytest.mark.parametrize(
+        argnames=["nbtosell", "before", "after"],
+        argvalues=(
+            (
+                1,
+                '{"foos": 0,"bars": 0,"foobars": 0,"money": 0}',
+                '{"foos": 0,"bars": 0,"foobars": 0,"money": 1}',
+            ),
+            (
+                3,
+                '{"foos": 0,"bars": 0,"foobars": 0,"money": 0}',
+                '{"foos": 0,"bars": 0,"foobars": 0,"money": 3}',
+            ),
+        ),
+    )
+    def test_deliver_result_ok(self, nbtosell, before, after):
+        act = activities.SellFoobar(nbtosell=nbtosell)
+        act.status = COMPLETED
+        beforedict = json.loads(before)
+        afterdict = json.loads(after)
+        remaining = act.deliver_result(resources=beforedict)
+        assert remaining == afterdict
+        # make sure the output is decoupled from the input
+        beforedict[RES_KEY_FOOS] = 10
+        assert remaining[RES_KEY_FOOS] == afterdict[RES_KEY_FOOS]
+        assert act.status == CONSUMED
 
 
 class TestBuyRobot:
@@ -345,5 +468,26 @@ class TestBuyRobot:
     def test_take_resources_failure(self, before):
         act = activities.BuyRobot()
         beforedict = json.loads(before)
-        with pytest.raises(activities.ActivityException):
+        with pytest.raises(activities.ActivityResourcesException):
             act.take_resources(resources=beforedict)
+
+    @pytest.mark.parametrize(
+        argnames=["before", "after"],
+        argvalues=(
+            (
+                '{"foos": 0,"bars": 0,"foobars": 0,"money": 0}',
+                '{"foos": 0,"bars": 0,"foobars": 0,"money": 0, "newrobots": 1}',
+            ),
+        ),
+    )
+    def test_deliver_result_ok(self, before, after):
+        act = activities.BuyRobot()
+        act.status = COMPLETED
+        beforedict = json.loads(before)
+        afterdict = json.loads(after)
+        remaining = act.deliver_result(resources=beforedict)
+        assert remaining == afterdict
+        # make sure the output is decoupled from the input
+        beforedict[RES_KEY_FOOS] = 10
+        assert remaining[RES_KEY_FOOS] == afterdict[RES_KEY_FOOS]
+        assert act.status == CONSUMED

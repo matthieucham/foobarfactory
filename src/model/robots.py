@@ -3,11 +3,7 @@
 import json
 from typing import Dict
 from . import activities
-
-# statuses
-READY = "ready"
-SCHEDULING = "scheduling"
-WORKING = "working"
+from .constants import READY, SCHEDULING, WORKING
 
 
 class RobotException(Exception):

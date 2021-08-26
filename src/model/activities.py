@@ -6,21 +6,32 @@ import random
 import json
 from typing import Dict
 
-# statuses
-READY = "ready"
-RUNNING = "running"
-COMPLETED = "completed"
+from .constants import (
+    RES_KEY_MONEY,
+    RES_KEY_BARS,
+    RES_KEY_FOOBARS,
+    RES_KEY_FOOS,
+    RES_KEY_NEWROBOTS,
+    READY,
+    RUNNING,
+    COMPLETED,
+    CONSUMED,
+    MINEFOO,
+    MINEBAR,
+    ASSEMBLEFOOBAR,
+    SELLFOOBAR,
+    BUYROBOT,
+)
 
-# types
-MINEFOO = "minefoo"
-MINEBAR = "minebar"
-ASSEMBLEFOOBAR = "assemblefoobar"
-SELLFOOBAR = "sellfoobar"
-BUYROBOT = "buyrobot"
+
+class ActivityResourcesException(Exception):
+    """Raised by activities when resources are not sufficient"""
+
+    pass
 
 
-class ActivityException(Exception):
-    """Exceptions raised by activities"""
+class ActivityStatusException(Exception):
+    """Raised by activities when bad status for the requested operation"""
 
     pass
 
@@ -54,21 +65,21 @@ class BaseActivity:
     def progress(self, tick: int) -> None:
         """Advance the activity change its status to COMPLETED if it is done."""
         if tick < self.start_tick:
-            raise ActivityException(
+            raise ValueError(
                 f"Current tick value {tick} is less than start_tick {self.start_tick}"
             )
         if self.has_completed(tick):
             self.status = COMPLETED
 
-    def result(self) -> int:
-        """
-        Give back the activity result as an int : number of entities produced.
+    # def result(self) -> int:
+    #     """
+    #     Give back the activity result as an int : number of entities produced.
 
-        The context (type of activity) provide info about what has been produced.
-        """
-        if self.status == COMPLETED:
-            return self.future_result
-        raise ActivityException("Activity has not completed, cannot get result")
+    #     The context (type of activity) provide info about what has been produced.
+    #     """
+    #     if self.status == COMPLETED:
+    #         return self.future_result
+    #     raise ActivityStatusException("Activity has not completed, cannot get result")
 
     def has_completed(self, tick) -> bool:
         return tick - self.start_tick >= self.duration
@@ -80,10 +91,31 @@ class BaseActivity:
         Arguments:
           - resources: Dict of resources available before the activity
         Return the remaining resources after consumption.
-        Raise ActivityException if resources are not sufficient.
+        Raise ActivityResourcesException if resources are not sufficient.
+        Raise ActivityStatusException if activity not ready.
         """
-        # base implementation : need nothing.
-        return resources.copy()
+        if not self.status == READY:
+            raise ActivityStatusException(
+                f"Activity not READY, current status={self.status}"
+            )
+        return self._take_resources(resources)  # impl by subclasses
+
+    def deliver_result(self, resources: Dict) -> Dict:
+        """
+        Add the result of the completed activity to the resources dict
+
+        Arguments:
+          - resources: Dict of resources before adding the new ones
+        Return the new resources after addition.
+        Raise ActivityStatusException if activity not completed.
+        """
+        if not self.status == COMPLETED:
+            raise ActivityStatusException(
+                f"Activity not COMPLETED, current status={self.status}"
+            )
+        result = self._deliver_result(resources)  # impl by subclasses
+        self.status = CONSUMED
+        return result
 
     def __str__(self) -> str:
         return json.dumps(self.to_dict())
@@ -99,9 +131,14 @@ class MineFoo(BaseActivity):
     def __init__(self) -> None:
         super().__init__(type=MINEFOO, duration=1, future_result=1)
 
-    def take_resources(self, resources: Dict) -> Dict:
+    def _take_resources(self, resources: Dict) -> Dict:
         # no resource needed.
         return resources.copy()
+
+    def _deliver_result(self, resources: Dict) -> Dict:
+        newres = resources.copy()
+        newres[RES_KEY_FOOS] += self.future_result
+        return newres
 
 
 class MineBar(BaseActivity):
@@ -120,9 +157,14 @@ class MineBar(BaseActivity):
             future_result=1,
         )
 
-    def take_resources(self, resources: Dict) -> Dict:
+    def _take_resources(self, resources: Dict) -> Dict:
         # no resource needed.
         return resources.copy()
+
+    def _deliver_result(self, resources: Dict) -> Dict:
+        newres = resources.copy()
+        newres[RES_KEY_BARS] += self.future_result
+        return newres
 
 
 class AssembleFoobar(BaseActivity):
@@ -137,15 +179,28 @@ class AssembleFoobar(BaseActivity):
             future_result=[1, 1, 1, 0, 0][random.randint(0, 4)],
         )
 
-    def take_resources(self, resources: Dict) -> Dict:
+    def _take_resources(self, resources: Dict) -> Dict:
         try:
-            if resources["foos"] < 1 or resources["bars"] < 1:
-                raise ActivityException("Not enough resource for activity %s", self)
+            if resources[RES_KEY_FOOS] < 1 or resources[RES_KEY_BARS] < 1:
+                raise ActivityResourcesException(
+                    "Not enough resource for activity %s", self
+                )
         except KeyError:
-            raise ActivityException("Not enough resource for activity %s", self)
-        resources["foos"] -= 1
-        resources["bars"] -= 1
-        return resources.copy()
+            raise ActivityResourcesException(
+                "Not enough resource for activity %s", self
+            )
+        newres = resources.copy()
+        newres[RES_KEY_FOOS] -= 1
+        newres[RES_KEY_BARS] -= 1
+        return newres
+
+    def _deliver_result(self, resources: Dict) -> Dict:
+        newres = resources.copy()
+        newres[RES_KEY_FOOBARS] += self.future_result
+        # the bar is reusable if no new foobar assembled
+        if self.future_result == 0:
+            newres[RES_KEY_BARS] += 1
+        return newres
 
 
 class SellFoobar(BaseActivity):
@@ -157,14 +212,24 @@ class SellFoobar(BaseActivity):
         super().__init__(type=SELLFOOBAR, duration=10, future_result=nbtosell)
         self.nbtosell = nbtosell
 
-    def take_resources(self, resources: Dict) -> Dict:
+    def _take_resources(self, resources: Dict) -> Dict:
         try:
-            if resources["foobars"] < self.nbtosell:
-                raise ActivityException("Not enough resource for activity %s", self)
+            if resources[RES_KEY_FOOBARS] < self.nbtosell:
+                raise ActivityResourcesException(
+                    "Not enough resource for activity %s", self
+                )
         except KeyError:
-            raise ActivityException("Not enough resource for activity %s", self)
-        resources["foobars"] -= self.nbtosell
-        return resources.copy()
+            raise ActivityResourcesException(
+                "Not enough resource for activity %s", self
+            )
+        newres = resources.copy()
+        newres[RES_KEY_FOOBARS] -= self.nbtosell
+        return newres
+
+    def _deliver_result(self, resources: Dict) -> Dict:
+        newres = resources.copy()
+        newres[RES_KEY_MONEY] += self.future_result
+        return newres
 
 
 class BuyRobot(BaseActivity):
@@ -173,12 +238,22 @@ class BuyRobot(BaseActivity):
     def __init__(self) -> None:
         super().__init__(type=BUYROBOT, duration=0, future_result=1)
 
-    def take_resources(self, resources: Dict) -> Dict:
+    def _take_resources(self, resources: Dict) -> Dict:
         try:
-            if resources["money"] < 3 or resources["foos"] < 6:
-                raise ActivityException("Not enough resource for activity %s", self)
+            if resources[RES_KEY_MONEY] < 3 or resources[RES_KEY_FOOS] < 6:
+                raise ActivityResourcesException(
+                    "Not enough resource for activity %s", self
+                )
         except KeyError:
-            raise ActivityException("Not enough resource for activity %s", self)
-        resources["money"] -= 3
-        resources["foos"] -= 6
-        return resources.copy()
+            raise ActivityResourcesException(
+                "Not enough resource for activity %s", self
+            )
+        newres = resources.copy()
+        newres[RES_KEY_MONEY] -= 3
+        newres[RES_KEY_FOOS] -= 6
+        return newres
+
+    def _deliver_result(self, resources: Dict) -> Dict:
+        newres = resources.copy()
+        newres[RES_KEY_NEWROBOTS] = self.future_result
+        return newres

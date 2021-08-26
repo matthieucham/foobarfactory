@@ -36,29 +36,6 @@ def mock_activity_builder():
     yield _make_act
 
 
-# @pytest.fixture
-# def mock_robot_minefoo():
-#     robot = MagicMock()
-#     robot.status = robots.READY
-#     robot.previous_activity = MagicMock()
-#     robot.previous_activity.type = activities.MINEFOO
-#     yield robot
-
-# @pytest.fixture
-# def mock_robot_minebar():
-#     robot = MagicMock()
-#     robot.status = robots.READY
-#     robot.previous_activity = MagicMock()
-#     robot.previous_activity.type = activities.MINEBAR
-#     yield robot
-
-# def mock_robot_noprevious():
-#     robot = MagicMock()
-#     robot.status = robots.READY
-#     robot.previous_activity = None
-#     yield robot
-
-
 class TestFactory:
     def test_init_noparam(self):
         fact = factory.Factory()
@@ -101,65 +78,6 @@ class TestFactory:
         assert len(mockupdateafteract.mock_calls) == nbrobots
 
     @pytest.mark.parametrize(
-        argnames=["activitytype", "result", "before", "after"],
-        argvalues=(
-            (
-                activities.MINEFOO,
-                1,
-                '{"foos": 0,"bars": 0,"foobars": 0,"money": 0}',
-                '{"foos": 1,"bars": 0,"foobars": 0,"money": 0}',
-            ),
-            (
-                activities.MINEBAR,
-                1,
-                '{"foos": 0,"bars": 0,"foobars": 0,"money": 0}',
-                '{"foos": 0,"bars": 1,"foobars": 0,"money": 0}',
-            ),
-            (
-                activities.ASSEMBLEFOOBAR,
-                0,
-                '{"foos": 0,"bars": 0,"foobars": 0,"money": 0}',
-                '{"foos": 0,"bars": 1,"foobars": 0,"money": 0}',
-            ),
-            (
-                activities.ASSEMBLEFOOBAR,
-                1,
-                '{"foos": 0,"bars": 0,"foobars": 0,"money": 0}',
-                '{"foos": 0,"bars": 0,"foobars": 1,"money": 0}',
-            ),
-            (
-                activities.SELLFOOBAR,
-                1,
-                '{"foos": 0,"bars": 0,"foobars": 0,"money": 0}',
-                '{"foos": 0,"bars": 0,"foobars": 0,"money": 1}',
-            ),
-            (
-                activities.SELLFOOBAR,
-                5,
-                '{"foos": 0,"bars": 0,"foobars": 0,"money": 0}',
-                '{"foos": 0,"bars": 0,"foobars": 0,"money": 5}',
-            ),
-            (
-                activities.BUYROBOT,
-                1,
-                '{"foos": 0,"bars": 0,"foobars": 0,"money": 0}',
-                '{"foos": 0,"bars": 0,"foobars": 0,"money": 0}',
-            ),
-        ),
-    )
-    def test_update_after_activity(self, activitytype, result, before, after):
-        # given
-        act = MagicMock()
-        act.type = activitytype
-        act.result.return_value = result
-        fact = factory.Factory()
-        fact.resources = json.loads(before)
-        # when
-        fact._update_after_activity(act)
-        # then
-        assert fact.resources == json.loads(after)
-
-    @pytest.mark.parametrize(
         argnames=["before", "after"],
         argvalues=(
             (
@@ -175,13 +93,6 @@ class TestFactory:
         fact._update_after_activity(None)
         # then
         assert fact.resources == json.loads(after)
-
-    def test_update_after_activity_invalid(self):
-        fact = factory.Factory()
-        act = MagicMock()
-        act.type = "SOMEINVALIDACTIVITY"
-        with pytest.raises(factory.FactoryException):
-            fact._update_after_activity(act)
 
     def test_update_after_buyrobot(self):
         fact = factory.Factory(initial_robots_nb=2)

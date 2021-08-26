@@ -4,14 +4,16 @@ import logging
 from collections import defaultdict
 from typing import Dict, List, Tuple
 from . import robots
+from .constants import (
+    RES_KEY_NEWROBOTS,
+    RES_KEY_BARS,
+    RES_KEY_FOOBARS,
+    RES_KEY_FOOS,
+    RES_KEY_MONEY,
+)
 from .activities import (
-    ActivityException,
     BaseActivity,
-    MINEBAR,
-    MINEFOO,
-    ASSEMBLEFOOBAR,
-    SELLFOOBAR,
-    BUYROBOT,
+    ActivityResourcesException,
 )
 
 # TODO move logger config to main script
@@ -46,10 +48,10 @@ class Factory:
     def __init__(self, initial_robots_nb: int = 2) -> None:
         self.robots = [robots.Robot() for _ in range(0, initial_robots_nb)]
         self.resources = {
-            "foos": 0,
-            "bars": 0,
-            "foobars": 0,
-            "money": 0,
+            RES_KEY_FOOS: 0,
+            RES_KEY_BARS: 0,
+            RES_KEY_FOOBARS: 0,
+            RES_KEY_MONEY: 0,
         }
 
     def to_dict(self) -> Dict:
@@ -115,7 +117,7 @@ class Factory:
                 available_robots.remove(assigned)
                 future_assignments.append((assigned, act))
             return future_assignments
-        except ActivityException as actexcept:
+        except ActivityResourcesException as actexcept:
             raise FactoryException("Not enough resources", actexcept)
 
     def _update_after_activity(self, activity: BaseActivity) -> None:
@@ -123,36 +125,14 @@ class Factory:
         if activity is None:
             logger.debug("no completed activity")
             return
-        if activity.type == MINEFOO:
-            logger.debug(
-                "activity %s completed, result=%s", activity, activity.result()
-            )
-            self.resources["foos"] += activity.result()
-        elif activity.type == MINEBAR:
-            logger.debug(
-                "activity %s completed, result=%s", activity, activity.result()
-            )
-            self.resources["bars"] += activity.result()
-        elif activity.type == ASSEMBLEFOOBAR:
-            logger.debug(
-                "activity %s completed, result=%s", activity, activity.result()
-            )
-            self.resources["foobars"] += activity.result()
-            # the bar is reusable if no new foobar assembled
-            if activity.result() == 0:
-                self.resources["bars"] += 1
-        elif activity.type == SELLFOOBAR:
-            logger.debug(
-                "activity %s completed, result=%s", activity, activity.result()
-            )
-            self.resources["money"] += activity.result()
-        elif activity.type == BUYROBOT:
-            nb_new_robots = activity.result()
-            logger.debug("activity %s completed, result=%s", activity, nb_new_robots)
+        newresources = activity.deliver_result(self.resources)
+        if RES_KEY_NEWROBOTS in newresources:
             # add robots
-            self.robots.extend([robots.Robot() for _ in range(0, nb_new_robots)])
-        else:
-            raise FactoryException("Unknown activity type %s", activity.type)
+            self.robots.extend(
+                [robots.Robot() for _ in range(0, newresources.get(RES_KEY_NEWROBOTS))]
+            )
+            del newresources[RES_KEY_NEWROBOTS]
+        self.resources = newresources
 
     def _find_good_robot(self, avrobots, activity_type: str) -> robots.Robot:
         # preference order:
