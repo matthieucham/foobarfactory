@@ -1,6 +1,5 @@
 import copy
 import json
-import logging
 from collections import defaultdict
 from typing import Dict, List, Tuple
 from . import robots
@@ -15,14 +14,6 @@ from .activities import (
     BaseActivity,
     ActivityResourcesException,
 )
-
-# TODO move logger config to main script
-from logging.config import fileConfig
-
-# fileConfig("logging.ini")
-
-# App logger as configured by logger.py
-logger = logging.getLogger()
 
 
 def group_by_previous_activity(
@@ -67,9 +58,7 @@ class Factory:
 
     def run(self, tick: int) -> None:
         """Run the factory at the specified tick and update the situation"""
-        logger.debug("running factory at tick %s", tick)
         for rob in self.robots:
-            logger.debug("advancing work of robot %s", rob)
             self._update_after_activity(rob.work(tick=tick))
 
     def set_activities(self, tick, *activities) -> None:
@@ -123,7 +112,6 @@ class Factory:
     def _update_after_activity(self, activity: BaseActivity) -> None:
         """Update the factory situation after the processing of the provided activity"""
         if activity is None:
-            logger.debug("no completed activity")
             return
         newresources = activity.deliver_result(self.resources)
         if RES_KEY_NEWROBOTS in newresources:

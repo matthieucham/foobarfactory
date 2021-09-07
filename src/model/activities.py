@@ -24,6 +24,21 @@ from .constants import (
 )
 
 
+def get_activty(type, **kwargs):
+    """Activity instance factory"""
+    if type == MINEFOO:
+        return MineFoo()
+    if type == MINEBAR:
+        return MineBar()
+    if type == ASSEMBLEFOOBAR:
+        return AssembleFoobar()
+    if type == SELLFOOBAR:
+        return SellFoobar(nbtosell=int(kwargs.get("nbtosell", 1)))
+    if type == BUYROBOT:
+        return BuyRobot()
+    raise ValueError(f"Unknown activity type {type}")
+
+
 class ActivityResourcesException(Exception):
     """Raised by activities when resources are not sufficient"""
 
