@@ -39,10 +39,10 @@ class Factory:
     def __init__(self, initial_robots_nb: int = 2) -> None:
         self.robots = [robots.Robot() for _ in range(0, initial_robots_nb)]
         self.resources = {
-            RES_KEY_FOOS: 6,
+            RES_KEY_FOOS: 0,
             RES_KEY_BARS: 0,
             RES_KEY_FOOBARS: 0,
-            RES_KEY_MONEY: 3,
+            RES_KEY_MONEY: 0,
         }
 
     def to_dict(self) -> Dict:
