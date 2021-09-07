@@ -39,10 +39,10 @@ class Factory:
     def __init__(self, initial_robots_nb: int = 2) -> None:
         self.robots = [robots.Robot() for _ in range(0, initial_robots_nb)]
         self.resources = {
-            RES_KEY_FOOS: 0,
+            RES_KEY_FOOS: 6,
             RES_KEY_BARS: 0,
             RES_KEY_FOOBARS: 0,
-            RES_KEY_MONEY: 0,
+            RES_KEY_MONEY: 3,
         }
 
     def to_dict(self) -> Dict:
@@ -98,7 +98,7 @@ class Factory:
                 activities, key=lambda act: 0 if act.type in previousacts else 1
             )
             for act in sortedacts:
-                available_resources = act.take_ressources(available_resources)
+                available_resources = act.take_resources(available_resources)
                 # Try to assign the act to a robot which previously did the same activity
                 # to minimize the time lost between activities
                 assigned = self._find_good_robot(available_robots, act.type)
