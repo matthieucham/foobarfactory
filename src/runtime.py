@@ -61,10 +61,11 @@ class Runtime:
         """
         do_next_anyway = force_one_next
         while True:  # run until robots are available
+            self.runner.run()
             if self._count_available_robots() > 0 and not do_next_anyway:
                 break
-            self.runner.run()
-            sleep(self.tick_delay)
+            if self.tick_delay > 0:  # else : no sleep, speed-of-light factory
+                sleep(self.tick_delay)
             self.runner.next()
             do_next_anyway = False
         return self.runner.expose()
