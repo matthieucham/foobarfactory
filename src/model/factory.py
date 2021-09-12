@@ -98,7 +98,7 @@ class Factory:
                 activities, key=lambda act: 0 if act.type in previousacts else 1
             )
             for act in sortedacts:
-                available_resources = act.take_ressources(available_resources)
+                available_resources = act.take_resources(available_resources)
                 # Try to assign the act to a robot which previously did the same activity
                 # to minimize the time lost between activities
                 assigned = self._find_good_robot(available_robots, act.type)
