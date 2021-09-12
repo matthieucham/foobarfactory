@@ -1,6 +1,9 @@
-from typing import Dict, Iterable, List, Tuple
+from typing import Dict, Iterable, List
 import click
 import copy
+import logging
+from datetime import datetime
+
 from model.factory import FactoryException
 from runtime import Runtime
 from model.constants import (
@@ -16,7 +19,19 @@ from model.constants import (
     BUYROBOT,
 )
 
-FOOBARFACTORY = Runtime(tick_delay=0)
+# Logging setup
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+file_handler = logging.FileHandler(
+    f"foobarfactoryrun_{datetime.timestamp(datetime.now())}.log"
+)
+formatter = logging.Formatter("%(asctime)s : %(levelname)s : %(message)s")
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
+
+
+# The factory instance
+FOOBARFACTORY = Runtime()
 
 
 def display(datadict, cleanscreen=True):
@@ -227,7 +242,9 @@ def foobarfactory():
     pilot = InteractiveFactoryPilot()
     dumbpilot = DumbAutopilot()
     smartpilot = SmartAutopilot()
+    FOOBARFACTORY.set_tick_delay(0)  # simulate lightspeed
     while len(FOOBARFACTORY.display().get("situation").get("robots")) < 30:
+        logger.info(FOOBARFACTORY.display())
         display(FOOBARFACTORY.display())
         activities = smartpilot.get_activities(FOOBARFACTORY.display())
         try:
@@ -237,8 +254,14 @@ def foobarfactory():
             else:
                 FOOBARFACTORY.run(force_one_next=True)
         except FactoryException as err:
+            logger.error(str(err))
             click.secho(f"Factory error: {str(err)}", fg="white", bg="red")
+    logger.info(FOOBARFACTORY.display())
     display(FOOBARFACTORY.display())
+    click.secho(
+        f"Number of robots reached after {FOOBARFACTORY.display().get('tick')} ticks",
+        fg="green",
+    )
 
 
 if __name__ == "__main__":
