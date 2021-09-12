@@ -48,6 +48,9 @@ class Runtime:
         self.runner = FactoryRunner()
         self.tick_delay = tick_delay
 
+    def set_tick_delay(self, delay: int) -> None:
+        self.tick_delay = delay
+
     def _count_available_robots(self):
         current = self.runner.expose()
         # there always are robots (at least 2)
