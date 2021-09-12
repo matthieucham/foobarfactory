@@ -151,10 +151,8 @@ class DumbAutopilot(FactoryPilot):
                     nbmissing = 84 - nbmoney - nbfoobars
                     if res.get(RES_KEY_FOOS) < nbmissing:
                         activities.append(MINEFOO)
-                        res[RES_KEY_FOOS] += 1
                     elif res.get(RES_KEY_BARS) < nbmissing:
                         activities.append(MINEBAR)
-                        res[RES_KEY_BARS] += 1
                     else:
                         # enough resources
                         activities.append(ASSEMBLEFOOBAR)
@@ -162,18 +160,15 @@ class DumbAutopilot(FactoryPilot):
                         # assuming foobar will succeed
                         res[RES_KEY_FOOS] -= 1
                         res[RES_KEY_BARS] -= 1
-                        res[RES_KEY_FOOBARS] += 1
                 # Do foos as long as we haven't reach 168
                 elif nbfoos < 168:
                     activities.append(MINEFOO)
-                    res[RES_KEY_FOOS] += 1
                 # Sell foobars
                 elif nbmoney < 84:
                     nbfoobars = res.get(RES_KEY_FOOBARS)
                     activities.append((SELLFOOBAR, {"nbtosell": min(nbfoobars, 5)}))
                     # adjust resources for next activity choice of the same round
-                    res[RES_KEY_FOOBARS] -= nbfoobars
-                    res[RES_KEY_MONEY] += min(nbfoobars, 5)
+                    res[RES_KEY_FOOBARS] -= min(nbfoobars, 5)
                 # Buy robot
                 elif nbmoney >= 3 and nbfoos >= 6:
                     activities.append(BUYROBOT)
@@ -186,13 +181,55 @@ class DumbAutopilot(FactoryPilot):
         return activities
 
 
+class SmartAutopilot(FactoryPilot):
+    """
+    This autopilot follows a smarter strategy: buy robots as fast as possible :
+
+    - if you can buy a robot, buy it
+    - if not, sell a foobar if you can
+    - if not :
+      * if you have less than 7 foos, mine one
+      * if you have more than 7 foos:
+        - if you have less than 1 bar, mine one
+        - else assemble one foobar
+    """
+
+    def get_activities(self, situation: Dict) -> List:
+        nbpa = self._get_nb_possible_actions(situation.get("situation").get("robots"))
+        res = copy.deepcopy(situation.get("situation").get("resources"))
+        # hold chosen activities
+        activities = []
+        for _ in range(0, nbpa):
+            nbfoobars = res.get(RES_KEY_FOOBARS)
+            nbbars = res.get(RES_KEY_BARS)
+            nbfoos = res.get(RES_KEY_FOOS)
+            nbmoney = res.get(RES_KEY_MONEY)
+            if nbmoney >= 3 and nbfoos >= 6:
+                activities.append(BUYROBOT)
+                res[RES_KEY_MONEY] -= 3
+                res[RES_KEY_FOOS] -= 6
+            elif nbfoobars >= 1:
+                activities.append((SELLFOOBAR, {"nbtosell": min(nbfoobars, 5)}))
+                res[RES_KEY_FOOBARS] -= min(nbfoobars, 5)
+            elif nbfoos < 7:
+                activities.append(MINEFOO)
+            elif nbbars < 1:
+                activities.append(MINEBAR)
+            elif nbfoos >= 1 and nbbars >= 1:
+                activities.append(ASSEMBLEFOOBAR)
+                res[RES_KEY_FOOS] -= 1
+                res[RES_KEY_BARS] -= 1
+        return activities
+
+
 @click.command()
 def foobarfactory():
     pilot = InteractiveFactoryPilot()
     dumbpilot = DumbAutopilot()
+    smartpilot = SmartAutopilot()
     while len(FOOBARFACTORY.display().get("situation").get("robots")) < 30:
         display(FOOBARFACTORY.display())
-        activities = dumbpilot.get_activities(FOOBARFACTORY.display())
+        activities = smartpilot.get_activities(FOOBARFACTORY.display())
         try:
             if activities:
                 FOOBARFACTORY.program(*activities)
