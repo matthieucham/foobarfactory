@@ -128,6 +128,7 @@ class InteractiveFactoryPilot(FactoryPilot):
 
 
 class DumbAutopilot(FactoryPilot):
+
     """
     This autopilot follows a straightforward strategy:
 
@@ -146,6 +147,10 @@ class DumbAutopilot(FactoryPilot):
     Obviously this is not optimized at all because only two robots are doing all the work.
     """
 
+    def __init__(self, target) -> None:
+        super().__init__()
+        self.target = target
+
     def get_activities(self, situation: Dict) -> List:
         # nbpa will always be 2 at the beginning because this strategy is dumb:
         nbpa = self._get_nb_possible_actions(situation.get("situation").get("robots"))
@@ -162,8 +167,8 @@ class DumbAutopilot(FactoryPilot):
             nbmoney = res.get(RES_KEY_MONEY)
             if nbrobots == 2:
                 # Do foobars as long as we haven't reach 84
-                if nbfoobars + nbmoney < 84:
-                    nbmissing = 84 - nbmoney - nbfoobars
+                if nbfoobars + nbmoney < 3 * (self.target - 2):
+                    nbmissing = 3 * (self.target - 2) - nbmoney - nbfoobars
                     if res.get(RES_KEY_FOOS) < nbmissing:
                         activities.append(MINEFOO)
                     elif res.get(RES_KEY_BARS) < nbmissing:
@@ -176,10 +181,10 @@ class DumbAutopilot(FactoryPilot):
                         res[RES_KEY_FOOS] -= 1
                         res[RES_KEY_BARS] -= 1
                 # Do foos as long as we haven't reach 168
-                elif nbfoos < 168:
+                elif nbfoos < 6 * (self.target - 2):
                     activities.append(MINEFOO)
                 # Sell foobars
-                elif nbmoney < 84:
+                elif nbmoney < 3 * (self.target - 2):
                     nbfoobars = res.get(RES_KEY_FOOBARS)
                     activities.append((SELLFOOBAR, {"nbtosell": min(nbfoobars, 5)}))
                     # adjust resources for next activity choice of the same round
@@ -238,15 +243,32 @@ class SmartAutopilot(FactoryPilot):
 
 
 @click.command()
-def foobarfactory():
-    pilot = InteractiveFactoryPilot()
-    dumbpilot = DumbAutopilot()
-    smartpilot = SmartAutopilot()
-    FOOBARFACTORY.set_tick_delay(0)  # simulate lightspeed
-    while len(FOOBARFACTORY.display().get("situation").get("robots")) < 30:
+@click.option(
+    "--delay",
+    default=1,
+    help="Delay between ticks, in seconds. Default 1. 0 is permitted: no delay",
+)
+@click.option(
+    "--target", default=30, help="Number of robots to reach to win. Default 30."
+)
+@click.option(
+    "--pilot",
+    type=click.Choice(["smart", "dumb", "interactive"]),
+    default="smart",
+    help="Kind of pilot who run the factory. Default smart. if interactive, you play",
+)
+def foobarfactory(delay: int, target: int, pilot: str):
+    if pilot == "smart":
+        pilot_instance = SmartAutopilot()
+    elif pilot == "dumb":
+        pilot_instance = DumbAutopilot(target=target)
+    else:
+        pilot_instance = InteractiveFactoryPilot()
+    FOOBARFACTORY.set_tick_delay(delay)
+    while len(FOOBARFACTORY.display().get("situation").get("robots")) < target:
         logger.info(FOOBARFACTORY.display())
         display(FOOBARFACTORY.display())
-        activities = smartpilot.get_activities(FOOBARFACTORY.display())
+        activities = pilot_instance.get_activities(FOOBARFACTORY.display())
         try:
             if activities:
                 FOOBARFACTORY.program(*activities)
