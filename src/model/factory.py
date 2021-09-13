@@ -51,7 +51,7 @@ class Factory:
             "robots": [copy.deepcopy(r.to_dict()) for r in self.robots],
         }
 
-    def __str__(self) -> str:
+    def __str__(self) -> str:  # pragma: no cover
         return json.dumps(self.to_dict())
 
     ### PUBLIC METHODS ###
@@ -106,7 +106,7 @@ class Factory:
                 available_robots.remove(assigned)
                 future_assignments.append((assigned, act))
             return future_assignments
-        except ActivityResourcesException as actexcept:
+        except ActivityResourcesException as actexcept:  # pragma: no cover
             raise FactoryException("Not enough resources", actexcept)
 
     def _update_after_activity(self, activity: BaseActivity) -> None:
@@ -139,4 +139,4 @@ class Factory:
             if len(bots) > 0:
                 return bots.pop()
         # should not happen
-        raise FactoryException("Not enough robots")
+        raise FactoryException("Not enough robots")  # pragma: no cover

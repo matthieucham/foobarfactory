@@ -3,6 +3,7 @@ import click
 import copy
 import logging
 from datetime import datetime
+import os
 
 from model.factory import FactoryException
 from runtime import Runtime
@@ -19,11 +20,13 @@ from model.constants import (
     BUYROBOT,
 )
 
+LOG_DIR = os.getenv("LOG_DIR", ".")
+
 # Logging setup
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 file_handler = logging.FileHandler(
-    f"foobarfactoryrun_{datetime.timestamp(datetime.now())}.log"
+    f"{LOG_DIR}/foobarfactoryrun_{datetime.timestamp(datetime.now())}.log"
 )
 formatter = logging.Formatter("%(asctime)s : %(levelname)s : %(message)s")
 file_handler.setFormatter(formatter)
