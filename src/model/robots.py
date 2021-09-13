@@ -56,7 +56,7 @@ class Robot:
         # Mean work is not complete:
         return None
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict:  # pragma: no cover
         output = {"status": self.status}
         if self.current_activity:
             output["current"] = self.current_activity.to_dict()
@@ -68,5 +68,5 @@ class Robot:
             output["previous"] = None
         return output
 
-    def __str__(self) -> str:
+    def __str__(self) -> str:  # pragma: no cover
         return json.dumps(self.to_dict())

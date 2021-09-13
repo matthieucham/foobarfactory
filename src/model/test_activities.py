@@ -110,6 +110,41 @@ class TestActivityCommon:
         assert activity.has_completed(done_tick)
 
     @pytest.mark.parametrize(
+        argnames=[
+            "activity",
+            "start_tick",
+            "toosoon_tick",
+        ],
+        argvalues=[
+            (
+                activities.MineFoo(),
+                2,
+                1,
+            ),
+            (
+                activities.MineBar(),
+                2,
+                1,
+            ),
+            (
+                activities.AssembleFoobar(),
+                5,
+                2,
+            ),
+            (
+                activities.SellFoobar(nbtosell=3),
+                8,
+                5,
+            ),
+        ],
+    )
+    def test_progress_fail(self, activity, start_tick, toosoon_tick):
+        # set the start tick of the activity
+        activity.start(start_tick)
+        with pytest.raises(ValueError):
+            activity.progress(toosoon_tick)
+
+    @pytest.mark.parametrize(
         argnames=["activity", "status"],
         argvalues=[
             (activities.MineFoo(), activities.RUNNING),
@@ -158,6 +193,26 @@ class TestActivityCommon:
         activity.status = status
         with pytest.raises(activities.ActivityStatusException):
             activity.deliver_result({})
+
+    @pytest.mark.parametrize(
+        argnames=[
+            "activitycode",
+        ],
+        argvalues=[
+            (activities.MINEFOO,),
+            (activities.MINEBAR,),
+            (activities.ASSEMBLEFOOBAR,),
+            (activities.SELLFOOBAR,),
+            (activities.BUYROBOT,),
+        ],
+    )
+    def test_get_activity(self, activitycode):
+        act = activities.get_activty(activitycode)
+        assert act.type == activitycode
+
+    def test_get_activity_fail(self):
+        with pytest.raises(ValueError):
+            act = activities.get_activty("Z")
 
 
 # Tests for specific activity
@@ -306,25 +361,47 @@ class TestAssembleFoobar:
             act.take_resources(resources=beforedict)
 
     @pytest.mark.parametrize(
-        argnames=["before", "possibleafters"],
+        argnames=["before", "after"],
         argvalues=(
             (
                 '{"foos": 0,"bars": 0,"foobars": 0,"money": 0}',
-                '[{"foos": 0,"bars": 0,"foobars": 1,"money": 0}, {"foos": 0,"bars":'
-                ' 1,"foobars": 0,"money": 0}]',
+                '{"foos": 0,"bars": 1,"foobars": 0,"money": 0}',
             ),
         ),
     )
-    def test_deliver_result_ok(self, before, possibleafters):
+    def test_deliver_result_not_assembled(self, before, after):
         act = activities.AssembleFoobar()
         act.status = COMPLETED
+        act.future_result = 0
         beforedict = json.loads(before)
-        afterdictlist = json.loads(possibleafters)
+        afterdict = json.loads(after)
         remaining = act.deliver_result(resources=beforedict)
-        assert remaining in afterdictlist
+        assert remaining == afterdict
         # make sure the output is decoupled from the input
         beforedict[RES_KEY_FOOS] = 10
-        assert remaining[RES_KEY_FOOS] == afterdictlist[0][RES_KEY_FOOS]
+        assert remaining[RES_KEY_FOOS] == afterdict[RES_KEY_FOOS]
+        assert act.status == CONSUMED
+
+    @pytest.mark.parametrize(
+        argnames=["before", "after"],
+        argvalues=(
+            (
+                '{"foos": 0,"bars": 0,"foobars": 0,"money": 0}',
+                '{"foos": 0,"bars": 0,"foobars": 1,"money": 0}',
+            ),
+        ),
+    )
+    def test_deliver_result_assembled(self, before, after):
+        act = activities.AssembleFoobar()
+        act.status = COMPLETED
+        act.future_result = 1
+        beforedict = json.loads(before)
+        afterdict = json.loads(after)
+        remaining = act.deliver_result(resources=beforedict)
+        assert remaining == afterdict
+        # make sure the output is decoupled from the input
+        beforedict[RES_KEY_FOOS] = 10
+        assert remaining[RES_KEY_FOOS] == afterdict[RES_KEY_FOOS]
         assert act.status == CONSUMED
 
 

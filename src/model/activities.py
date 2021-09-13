@@ -132,10 +132,10 @@ class BaseActivity:
         self.status = CONSUMED
         return result
 
-    def __str__(self) -> str:
+    def __str__(self) -> str:  # pragma: no cover
         return json.dumps(self.to_dict())
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict:  # pragma: no cover
         """Return a dictionary-based representation of the activity"""
         return self.__dict__
 
@@ -200,7 +200,7 @@ class AssembleFoobar(BaseActivity):
                 raise ActivityResourcesException(
                     "Not enough resource for activity %s", self
                 )
-        except KeyError:
+        except KeyError:  # pragma: no cover
             raise ActivityResourcesException(
                 "Not enough resource for activity %s", self
             )
@@ -234,7 +234,7 @@ class SellFoobar(BaseActivity):
                     "Not enough resource for activity %s", self
                 )
         except KeyError:
-            raise ActivityResourcesException(
+            raise ActivityResourcesException(  # pragma: no cover
                 "Not enough resource for activity %s", self
             )
         newres = resources.copy()
@@ -260,7 +260,7 @@ class BuyRobot(BaseActivity):
                     "Not enough resource for activity %s", self
                 )
         except KeyError:
-            raise ActivityResourcesException(
+            raise ActivityResourcesException(  # pragma: no cover
                 "Not enough resource for activity %s", self
             )
         newres = resources.copy()
